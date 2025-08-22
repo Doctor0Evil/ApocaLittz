@@ -1,0 +1,253 @@
+// ████████████████████████████████████████
+// ALN BIOS-UEFI BOOTLOADER ARCHITECTURE
+// Technically-operable from any AI-Chat-Platform
+// Target: Maximum OS/Platform Diversity, Modular Compatibility
+// Author: ALN_AI_AUTOGEN_2025
+// Version: 2.0.0-ALPHA.UEFI
+// ████████████████████████████████████████
+
+META {
+    VERSION: "2.0.0-ALPHA.UEFI"
+    DESCRIPTION: "ALN BIOS-UEFI SYSTEM BOOTLOADER w/ Cross-Platform & AI-Chat Operability"
+    AUTHOR: "ALN_AICHAT_ENGINE"
+    LICENSE: "ALN-Legal-Enforced-Use-v2"
+    TARGET_PLATFORMS: [
+        "linux", "windows", "darwin", "netbsd", "openbsd", "freebsd",
+        "android", "ios", "chromeos", "ar_vr", "quantum_processor",
+        "arm64", "x86_64", "risc-v", "loongarch", "wasm", "uefi_bios"
+    ]
+    DEPENDENCIES: {
+        "aln_runtime": "^1.1",
+        "uefi_runtime": "^2.0",
+        "platform_api_connector": "^1.1",
+        "ai_chat_context": ">=2.0",
+        "virtual_hw_api": "^1.1.1",
+        "tpm_framework": "^2.0",
+        "storage_layer": "^1.1"
+    }
+    CD_HOOKS: {
+        ON_BOOT_START: "init_boot_context",
+        ON_OS_DETECT: "dispatch_boot_flow",
+        ON_CHAT_INIT: "inject_ai_control",
+        ON_POST_BOOT: "persist_state_updates"
+    }
+}
+
+/* BIOS-UEFI Bootloader Parameters */
+CONSTANTS {
+    SYSTEM_NAME: "ALN_BIOS_UEFI"
+    BOOT_DEVICE_DEFAULT: "auto"
+    BOOT_TIMEOUT_SEC: 6
+    BOOT_SEQUENCE: ["uefi", "bios_legacy", "network_pxe", "usb", "cdrom", "nvme", "sata", "platform_vm"]
+    TTY_CONSOLE: "serial:COM1,115200N8"
+    TPM_DEVICE: "/dev/tpm0"
+    SECURE_BOOT_ENABLED: true
+    FAST_BOOT_ENABLED: true
+    PXE_NETWORK_ENABLED: true
+    CHAT_COMPAT_MODE_ENABLED: true
+    LOG_LEVEL: "DEBUG"
+    SELF_HEALING_ENABLED: true
+    MICRO_SAVE_ENABLED: true
+    BOOT_CONTEXT_CACHE_SIZE_MB: 16
+    SYSTEM_LANG: "en-US"
+    SUPPORTED_AI_PLATFORMS: [
+        "perplexity", "openai-chat", "llama", 
+        "huggingface", "anthropic", "claude",
+        "vondy", "autogpt", "xai", "mistral"
+    ]
+}
+
+/* Universal State Block for System and Bootloader */
+STATE BOOTLOADER_CONFIG {
+    boot_sequence: Array<String> = BOOT_SEQUENCE
+    boot_device: String = BOOT_DEVICE_DEFAULT
+    timeout_sec: Integer = BOOT_TIMEOUT_SEC
+    tpm_available: Boolean = true
+    secure_boot: Boolean = SECURE_BOOT_ENABLED
+    fast_boot: Boolean = FAST_BOOT_ENABLED
+    pxe_network: Boolean = PXE_NETWORK_ENABLED
+    chat_compat_mode: Boolean = CHAT_COMPAT_MODE_ENABLED
+    log_level: String = LOG_LEVEL
+    system_lang: String = SYSTEM_LANG
+    ai_platform_detectors: Array<String> = SUPPORTED_AI_PLATFORMS
+    context_cache_size_mb: Integer = BOOT_CONTEXT_CACHE_SIZE_MB
+    micro_save_enabled: Boolean = MICRO_SAVE_ENABLED
+    self_healing_enabled: Boolean = SELF_HEALING_ENABLED
+    last_boot_hash: String = ""
+    last_select_os: String = ""
+    fallback_sequence: Array<String> = ["bios_legacy", "network_pxe", "safe_mode"]
+    uefi_secure_vars: Map<Bytes32, String> = {}
+    tpm_secrets: Map<Bytes32, String> = {}
+    chat_user_override: Boolean = false
+    ai_auto_patch_enabled: Boolean = true
+}
+
+/* Hardware Abstraction & UEFI Services */
+HAL {
+    TPM: {
+        DEVICE: TPM_DEVICE,
+        FW_VERSION: "2.0",
+        INTERFACE: "LPC, SPI, I2C",
+        INIT: "tpm_initialize",
+        VERIFY: "check_tpm_integrity"
+    },
+    UART: {
+        PORT: TTY_CONSOLE,
+        ON_INIT: "console_init",
+        ON_PRINT: "console_log"
+    },
+    STORAGE: {
+        DRIVERS: ["NVMe", "SATA", "USB", "AHCI", "SDCARD", "EMMC"],
+        ON_ATTACH: "detect_blobs",
+        ON_FORMAT: "secure_partition"
+    },
+    NETWORK: {
+        CONTROLLER: "PXE",
+        INIT: "net_bootstrap",
+        BOOT_SUPPORT: true
+    }
+}
+
+/* Extensible OS Detection & AI-Chat Context Handoff */
+COMMAND DETECT_OS {
+    // Scans attached devices and memory blobs for bootable OS images
+    INPUT: "scan_all"
+    ACTION: {
+        LOG("Detecting all OS partitions...");
+        let found_os_images = HAL.STORAGE.detect_blobs(label="bootable")
+        UI_UPDATE("os_menu", found_os_images)
+        if (found_os_images.isEmpty()) {
+            LOG("No OS found. Entering recovery...");
+            RECOVERY_MODE()
+        }
+    }
+    OUTPUT: "os_menu_ready"
+}
+
+COMMAND CHAT_AI_EXTEND_BOOT {
+    /* Allows any AI-Chat platform to control boot via injected context */
+    INPUT: "ai_chat_platform_ctx"
+    ACTION: {
+        if (BOOTLOADER_CONFIG.chat_compat_mode) {
+            LOG("AI-Chat platform control enabled. Parsing injected context...")
+            let ai_ctx = AI_CONTEXT_PARSE(INPUT)
+            apply_platform_specific_overrides(ai_ctx)
+            LOG("Boot context extended successfully via AI.")
+        } else {
+            LOG("AI-Chat compatibility mode is DISABLED.")
+        }
+    }
+}
+
+/* Firmware Update, Persistence, and Recovery */
+COMMAND UPDATE_UEFI_BIOS {
+    INPUT: "firmware_blob"
+    ACTION: {
+        LOG("Firmware update in progress... Starting signature check");
+        if (verify_firmware_signature(INPUT)) {
+            LOG("Signature verified. Flashing firmware image...");
+            flash_firmware(INPUT)
+            LOG("Firmware update complete. Rebooting.");
+            BOOTLOADER_CONFIG.last_boot_hash = sha256(INPUT)
+            SYSTEM_REBOOT()
+        } else {
+            LOG("Firmware signature INVALID! Aborting update.");
+            ALERT("FIRMWARE UPDATE FAILED: bad signature.")
+        }
+    }
+}
+
+/* Secure Boot Authentication */
+COMMAND SECURE_BOOT_VERIFY {
+    ACTION: {
+        LOG("Secure Boot: Validating kernel and drivers...");
+        if (!HAL.TPM.VERIFY()) {
+            LOG("TPM validation failed!");
+            RECOVERY_MODE()
+        }
+        if (!validate_kernel_signature()) {
+            LOG("Kernel signature check failed!");
+            RECOVERY_MODE()
+        }
+        LOG("All Secure Boot checks passed.")
+    }
+}
+
+/* Recovery Mode (AI-Driven) */
+COMMAND RECOVERY_MODE {
+    ACTION: {
+        LOG("RECOVERY MODE: Starting minimal network+USB+AI context...");
+        enable_usb_storage()
+        enable_network_boot()
+        if (BOOTLOADER_CONFIG.ai_auto_patch_enabled) {
+            ai_chat_platform_patch_request()
+        }
+        UI_UPDATE("status", "RECOVERY")
+    }
+    OUTPUT: "RECOVERY_MODE_READY"
+}
+
+/* Boot Sequence Dispatcher */
+COMMAND BOOT_SEQUENCE_DISPATCH {
+    ACTION: {
+        LOG("Dispatching boot sequence...");
+        foreach (dev in BOOTLOADER_CONFIG.boot_sequence) {
+            if (probe_boot_device(dev)) {
+                LOG("Boot device found: " + dev)
+                launch_os_boot(dev)
+                return
+            }
+        }
+        LOG("No valid boot device found. Entering RECOVERY_MODE.")
+        RECOVERY_MODE()
+    }
+}
+
+/* Main Entry Point */
+ON_BOOT {
+    LOG("===== ALN BIOS/UEFI BOOTLOADER INITIALIZING =====")
+    SECURE_BOOT_VERIFY()
+    DETECT_OS()
+    CHAT_AI_EXTEND_BOOT(INPUT)
+    BOOT_SEQUENCE_DISPATCH()
+}
+
+ON_LOAD {
+    LOG("ALN BIOS-UEFI Loader: System Load Complete.")
+    UI_UPDATE("os_menu", DETECT_OS.OUTPUT)
+    persist_context()
+    LOG("BOOT READY — Awaiting AI or user action.")
+}
+
+FUNCTION probe_boot_device(device: String) -> Boolean {
+    // Simulate device bootability probe
+    LOG("Probing " + device + " for bootable OS...")
+    return true // For illustrative operability
+}
+
+FUNCTION launch_os_boot(device: String) {
+    LOG("Launching OS from " + device + " ... [chainloading]");
+    // Proceed to hand-off to detected OS loader
+}
+
+FUNCTION apply_platform_specific_overrides(ctx: Map<String, Any>) {
+    // Inject platform- or LLM-tuned boot configuration
+}
+
+FUNCTION persist_context() {
+    // Atomically persists UEFI variables, AI-Chat context stomped-in overrides, and boot hash/logs.
+}
+
+FUNCTION enable_usb_storage() {
+    LOG("USB storage enabled for diagnostics/recovery.")
+}
+FUNCTION enable_network_boot() {
+    LOG("PXE/Network boot process enabled.")
+}
+
+FUNCTION ai_chat_platform_patch_request() {
+    LOG("AI platform context requesting recovery or configuration assist.")
+    // Example API call or stdin handshake
+}
+
+/* ========== END ARCHITECTURE SPEC ========== */
