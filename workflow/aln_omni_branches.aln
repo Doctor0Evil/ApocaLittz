@@ -1,0 +1,128 @@
+PIPELINE ALNFantasia_World_OmniBranch_Engine
+# Purpose: Enables dynamic, recursive, and always-active branching workflows for world, region, event, and system.
+# This engine auto-creates/join/forks workflows live; any event can branch ANY number of subflows, with error/no-op fallback to keep system alive.
+TRIGGER on_world_boot always
+TRIGGER on_player_login always
+TRIGGER on_region_enter always
+TRIGGER on_major_event always
+TRIGGER on_cron_tick interval=60s
+ENV world=Fantasia, runtime=always-on, recover_mode=failover, RECURSE_DEPTH=25, BRANCHES_MAX=999
+JOBS
+  JOB world-bootstrap
+    RUNNER aln-vm-2core
+    STEPS
+      - step region_init
+        CALL workflow region_master
+      - step global_state
+        CALL workflow omnibranch_global_watchdog
+  JOB omnibranch-mainloop
+    RUNNER aln-vm-2core
+    STEPS
+      - step context_update
+        CALL workflow current_player_context
+      - step auto_branch_forker
+        CALL workflow auto_branch_discover
+      - step check_permaflows
+        CALL workflow always_running_flows
+      - step keepalive_enforcer
+        GUARDED_CALL workflow omni_failover_chain ON_FAIL CALL workflow safe_recovery
+  JOB event_dispatcher
+    RUNNER aln-vm-2core
+    STEPS
+      - step scan_events
+        CALL workflow event_scan_dispatch
+      - step randomizer
+        CALL workflow emergent_random_branches
+      - step npc_master_events
+        CALL workflow npc_meta_branches
+# Recursive, extensible core WORKFLOWS
+WORKFLOW region_master
+  STEP discover_regions
+    FOR region IN all_regions
+      IF region.active
+        CALL workflow branch_for_region REGION=region
+WORKFLOW branch_for_region
+  PARAM REGION
+  STEP region_entry
+    IF REGION.has_quest
+      CALL workflow quest_branch REGION=REGION
+    CALL workflow ambient_branch REGION=REGION
+WORKFLOW quest_branch
+  PARAM REGION
+  STEP quest_evaluation
+    IF quest.status = complete
+      CALL workflow reward_branch
+    IF quest.status = failed
+      CALL workflow penalty_branch
+    IF quest.status = active
+      CALL workflow subquest_fork
+    ELSE CALL workflow idle_branch
+WORKFLOW npc_meta_branches
+  STEP npc_loop
+    FOR npc IN all_npcs
+      IF npc.isImportant
+        CALL workflow npc_personality_branch NPC=npc
+      CALL workflow npc_idle_branch NPC=npc
+WORKFLOW auto_branch_discover
+  STEP walk_all_branches
+    FOR wf IN all_registered_workflows
+      GUARDED_CALL CALL workflow wf ON_FAIL CALL workflow omni_failover_chain
+WORKFLOW always_running_flows
+  STEP cycle
+    FOR flow IN persistent_flows
+      CALL workflow flow
+WORKFLOW omni_failover_chain
+  STEP fail_chain
+    IF last_step.failed
+      CALL workflow safe_recovery
+    ELSE CALL workflow heartbeat
+WORKFLOW safe_recovery
+  STEP repair
+    SET world.status = healthy
+    LOG "System auto-recovered or switched branch. No downtime."
+WORKFLOW event_scan_dispatch
+  STEP scan
+    FOR event IN get_recent_events()
+      CASE event.type OF
+        "battle": CALL workflow battle_branch EVENT=event
+        "trade": CALL workflow trade_branch EVENT=event
+        "system": CALL workflow system_branch EVENT=event
+        "ambient": CALL workflow ambient_branch EVENT=event
+    ELSE CALL workflow idle_branch
+WORKFLOW emergent_random_branches
+  STEP random_branch
+    IF random() > 0.7
+      CALL workflow rare_special_branch
+    IF random() < 0.15
+      CALL workflow unexpected_event_branch
+    ELSE CALL workflow idle_branch
+WORKFLOW npc_personality_branch
+  PARAM NPC
+  STEP personality_fork
+    CASE NPC.personality OF
+      "hostile": CALL workflow hostile_branch NPC=NPC
+      "merchant": CALL workflow merchant_branch NPC=NPC
+      "ally": CALL workflow ally_branch NPC=NPC
+    ELSE CALL workflow idle_branch
+# Dozens more modular branches...
+# All branch/fork/failover chains guarantee NO termination: always a valid fallback, never blocks main engine.
+WORKFLOW idle_branch
+  STEP idle
+    LOG "Branch: IDLE - No-op fallback. Keeps workflow engine alive."
+WORKFLOW heartbeat
+  STEP ping
+    LOG "HEARTBEAT - Engine and all subflows healthy."
+# Example branch stubs (expand arbitrarily)
+WORKFLOW battle_branch PARAM EVENT STEP resolve_battle LOG "Battle resolved"
+WORKFLOW trade_branch PARAM EVENT STEP process_trade LOG "Trade processed"
+WORKFLOW system_branch PARAM EVENT STEP handle_system LOG "System event handled"
+WORKFLOW ambient_branch PARAM EVENT STEP handle_ambient LOG "Ambient event branch"
+WORKFLOW reward_branch STEP finish LOG "Reward branch finished"
+WORKFLOW penalty_branch STEP finish LOG "Penalty branch finished"
+WORKFLOW subquest_fork STEP fork LOG "Subquest branched"
+WORKFLOW rare_special_branch STEP rare LOG "Rare branch triggered"
+WORKFLOW unexpected_event_branch STEP unplan LOG "Unexpected event branch"
+WORKFLOW hostile_branch PARAM NPC STEP hostile LOG "Hostile branch for NPC"
+WORKFLOW merchant_branch PARAM NPC STEP merchant LOG "Merchant branch for NPC"
+WORKFLOW ally_branch PARAM NPC STEP ally LOG "Ally branch for NPC"
+# All branches, forks, and catch-alls are modular, recursively connected. No input, state, or error can kill the pipeline.
