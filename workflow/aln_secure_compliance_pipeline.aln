@@ -1,0 +1,41 @@
+PIPELINE ALN Secure Compliance Pipeline
+TRIGGER
+  on_push branches main, release/**
+  on_pull_request types opened, synchronize
+
+ENV
+  COMPLIANCE_MODE PCI_DSS_v4.0
+
+JOBS
+
+  JOB pre-commit-scan
+    RUNNER ubuntu-latest
+
+    STEPS
+      - step checkout
+        USE actions/checkout@v4
+
+      - step setup_ruby
+        USE ruby/setup-ruby@v1
+        ARGS ruby-version=3.2, bundler-cache=true
+
+      - step install_ml_libs
+        RUN
+          gem install sciruby
+          gem install rumale
+
+      - step gitleaks_scan
+        USE gitleaks/gitleaks-action@v2
+        ARGS config-path=.gitleaks.toml
+
+      - step run_ml_compliance
+        RUN ruby scripts/ml_compliance.rb
+
+      - step enforce_commit_policy
+        RUN
+          IF file_contains('gitleaks-report.sarif', 'secret') AND ENV.COMPLIANCE_MODE == "PCI_DSS_v4.0" THEN
+            echo "::error ::Secret detected under PCI policy! Blocked."
+            exit 1
+          ENDIF
+
+# Extend here with additional audit, compliance, or publishing jobs as needed.
