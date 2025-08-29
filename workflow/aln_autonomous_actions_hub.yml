@@ -1,0 +1,74 @@
+PIPELINE ALN_Autonomous_Actions_Hub
+# Orchestrates self-triggering runners with ML-powered logic and .aln-actions-hub plugins.
+# If unable to check/fix, autocreates missing logic or runners recursively.
+
+TRIGGER on_cron_tick interval=30s
+TRIGGER on_push always
+TRIGGER on_pull_request always
+TRIGGER on_ml_event always
+
+ENV AUTOFIX_MODE=full, ML_RETRY_LIMIT=3, ACTIONS_HUB=".aln-actions-hub"
+
+JOBS
+
+  JOB ml_checkup_runner
+    RUNNER aln-vm-2core
+    STEPS
+      - step scan_for_anomalies
+        CALL workflow ml_scan_anomalies
+      - step ml_fix_logic
+        CALL workflow ml_fix_and_patch
+      - step actions_hub_plugin
+        CALL workflow actions_hub_executor
+
+  JOB fallback_auto_creator
+    RUNNER aln-vm-2core
+    STEPS
+      - step fallback_check_or_create
+        IF workflow.fail
+          CALL workflow auto_create_logic
+        ELSE
+          CALL workflow auto_create_runner
+
+WORKFLOW ml_scan_anomalies
+  STEP ml_infer
+    CALL ml_module.analyze(workspace=target, mode=deep)
+    IF ml_module.findings > 0
+      CALL workflow ml_fix_and_patch
+    ELSE
+      CALL workflow actions_hub_executor
+
+WORKFLOW ml_fix_and_patch
+  STEP attempt_fix
+    TRY
+      CALL ml_module.fix(findings=ml_module.findings)
+    CATCH error
+      CALL workflow fallback_auto_creator
+
+WORKFLOW actions_hub_executor
+  STEP plugin_hook
+    FOR action IN load_actions(ACTIONS_HUB)
+      TRY
+        CALL action.execute()
+      CATCH error
+        CALL workflow fallback_auto_creator
+
+WORKFLOW auto_create_logic
+  STEP create_missing_workflows
+    CALL workflow_generator.create_all_missing()
+    LOG "Auto-created missing workflows via ML detection."
+
+WORKFLOW auto_create_runner
+  STEP create_missing_runners
+    CALL runner_generator.create_all_missing()
+    LOG "Auto-created missing runners for pipeline continuity."
+
+# Utility ML Modules & Plugins (external in hub)
+ML_MODULE ml_module
+  FUNCTION analyze ARGS workspace, mode RETURNS findings
+  FUNCTION fix ARGS findings
+
+PLUGIN actions_hub
+  FUNCTION load_actions ARGS hub_path RETURNS action_list
+
+# Guarantee: All key logic/faults routed through auto-create or re-run; hub+ML always ensures live fix or creation.
