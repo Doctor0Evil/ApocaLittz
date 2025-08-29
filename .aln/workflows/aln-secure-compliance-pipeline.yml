@@ -1,0 +1,135 @@
+name: ALN Secure Compliance Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  # Centralize compliance enforcement mode (can be matrix/secret/param-controlled)
+  COMPLIANCE_MODE: 'PCI_DSS_v4.0'   # fallback: SOC2, HIPAA, ISO27001, CUSTOM_XYZ
+
+jobs:
+  pre-commit-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+
+      - name: Enforce Commit Policy
+        run: |
+          # Abort if secrets were found (hard fail for PCI, soft for dev)
+          if grep -q 'secret' gitleaks-report.sarif && [ "${{ env.COMPLIANCE_MODE }}" = "PCI_DSS_v4.0" ]; then
+            echo "::error ::Secret detected under PCI policy! Blocked."
+            exit 1
+          fi
+
+  compliance-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compliance: [PCI_DSS_v4.0, SOC2, ISO27001, HIPAA, CUSTOM_ORG, LAX_DEV]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Display active compliance
+        run: echo "Policy: ${{ matrix.compliance }}"
+
+      - name: Set policy allow-lists
+        id: set_policy
+        run: |
+          case "${{ matrix.compliance }}" in
+            PCI_DSS_v4.0)
+              echo "ALLOW_BATS=.bat,pre-commit,pre-push" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=clone,fork,checkout,commit" >> $GITHUB_ENV
+              ;;
+            SOC2)
+              echo "ALLOW_BATS=.bat,.cmd,pre-commit" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=clone,commit,merge,tag" >> $GITHUB_ENV
+              ;;
+            ISO27001)
+              echo "ALLOW_BATS=.bat,.ps1" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=clone,commit,checkout,branch" >> $GITHUB_ENV
+              ;;
+            CUSTOM_ORG)
+              echo "ALLOW_BATS=.bat,.sh,pre-commit,org-special" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=all" >> $GITHUB_ENV
+              ;;
+            LAX_DEV)
+              echo "ALLOW_BATS=*" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=all" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "ALLOW_BATS=.bat,pre-commit" >> $GITHUB_ENV
+              echo "ALLOW_GIT_OPS=clone,commit" >> $GITHUB_ENV
+          esac
+
+      - name: Bat PowerShell Script Compliance Check
+        run: |
+          echo "Checking .bat/.cmd capabilities for: ${{ matrix.compliance }}"
+          # Simulate checks or allow/disallow based on env vars; add real logic as needed
+          if [[ "$ALLOW_BATS" == "*" || "$ALLOW_BATS" == *".bat"* ]]; then
+            echo ".bat execution allowed under ${{ matrix.compliance }}"
+          else
+            echo "::notice ::.bat disabled for ${{ matrix.compliance }}"
+          fi
+
+      - name: Git Command Compliance Gate
+        run: |
+          echo "Checking .git capabilities for $ALLOW_GIT_OPS"
+          # Optionally block or alter git commands via policy
+          if [[ "$ALLOW_GIT_OPS" != "all" ]]; then
+            for op in commit tag merge; do
+              if [[ "$ALLOW_GIT_OPS" != *"$op"* ]]; then
+                echo "::warning ::$op is disabled under ${{ matrix.compliance }}"
+              fi
+            done
+          fi
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node/NPM Audit (alternate: swap for python, java, go as needed)
+        if: contains(matrix.compliance, 'PCI_DSS') || contains(matrix.compliance, 'SOC2')
+        run: |
+          npm install
+          npm audit --audit-level=high
+
+      - name: Custom Lint/Org Policy Script
+        run: |
+          if [[ "$COMPLIANCE_MODE" == "CUSTOM_ORG" ]]; then
+            ./scripts/org_custom_linter.sh
+          else
+            echo "Standard policy, no extra linter."
+          fi
+
+  release:
+    needs: [pre-commit-scan, compliance-matrix, security-audit]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and Package
+        run: make build  # Replace as needed for your stack
+
+      - name: Tag and Push Release
+        if: contains(env.ALLOW_GIT_OPS, 'tag')
+        run: |
+          git tag v${{ github.run_number }}
+          git push --tags
+
+      - name: Notify Security Team
+        if: contains(matrix.compliance, 'PCI_DSS') || contains(matrix.compliance, 'SOC2')
+        run: |
+          curl -X POST -H "Authorization: Bearer $SECURITY_WEBHOOK_TOKEN" \
+            -d '{"message": "Release Pipeline completed for ${{ github.repository }}" }' \
+            $SECURITY_TEAM_WEBHOOK
