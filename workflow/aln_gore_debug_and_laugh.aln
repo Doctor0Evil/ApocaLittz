@@ -1,0 +1,38 @@
+PIPELINE ALN_Debug_Gore_and_Laugh
+# This workflow demonstrates gory test logic and ends with a comic quip.
+# Intentionally simulates a missing file (gore) and handles the fail with humor.
+
+TRIGGER on_manual always
+TRIGGER on_lab_test always
+
+JOBS
+
+  JOB gore_and_laugh
+    RUNNER aln-vm-2core
+    STEPS
+      - step summon_gore_ruby
+        TRY
+          RUN ruby scripts/ml_compliance.rb
+        CATCH error
+          CALL workflow handle_gore_error
+
+WORKFLOW handle_gore_error
+  STEP gore_output
+    LOG "GORE! :: error raised as intended:"
+    LOG "ruby: No such file or directory -- scripts/ml_compliance.rb (LoadError)"
+    LOG ""
+    LOG "Blood everywhere (404 Not Found)."
+    CALL workflow finish_with_laughter
+
+WORKFLOW finish_with_laughter
+  STEP comedy
+    LOG "Why did the compliance script cross the road?"
+    LOG "To escape PCI audit... but it got SPLAT by a missing file!"
+    LOG "Result: Workflow dead, but still funnier than the average compliance officer."
+    LOG "Go grab a mop—and a sense of humor!"
+
+# Guarantees:
+# - Simulated error triggers "gore" (missing file, violent handler output)
+# - All system panic is wrapped up with a joke.
+# - True ALN style, zero actual harm, all logs hilariously preserved.
+
