@@ -1,5 +1,3 @@
-;; github-file-destination: src/devtools/aln_openai_toolchain_reflection.lisp
-
 ;; Core description of OpenAI-style AI toolchain system, adapted for ALN CLI/Combat-Dev Environment:
 ;; All actions, debug params, and behaviors are routed via ALN processing hooks and internal CLI logics.
 (defun process-openai-ecosystem-inspect ()
@@ -48,3 +46,75 @@
     log
   )
 )
+;; https://github.com/Doctor0Evil/ALN_Programming_Language.git/src/devtools/aln_openai_toolchain_reflection.lisp
+(defpackage :aln.toolchain.reflection
+  (:use :cl :alexandria)
+  (:export :reflect-toolchain-event :dump-reflection-state :inject-meta-diagnostics))
+
+(in-package :aln.toolchain.reflection)
+
+(defvar *toolchain-reflection-log* (make-array 0 :adjustable t :fill-pointer t))
+(defvar *error-backtrace-log* (make-array 0 :adjustable t :fill-pointer t))
+(defvar *toolchain-event-stack* (make-array 0 :adjustable t :fill-pointer t))
+(defvar *meta-diagnostics-enabled* t)
+
+(defun reflect-toolchain-event (event &key (trace-id (gensym "EVT-")) source)
+  "Logs the toolchain event with structure, stack trace, and dynamic introspection if enabled."
+  (let ((evt-record (list :timestamp (get-universal-time)
+                          :event event
+                          :trace-id trace-id
+                          :source source
+                          :stack (copy-seq *toolchain-event-stack*))))
+    (vector-push-extend evt-record *toolchain-reflection-log*)
+    (push trace-id *toolchain-event-stack*)
+    (when *meta-diagnostics-enabled*
+      (inject-meta-diagnostics evt-record))
+    (pop *toolchain-event-stack*)
+    evt-record))
+
+(defun inject-meta-diagnostics (evt-record)
+  "Dynamically injects self-test and meta-observation notes into the event log."
+  (let ((meta-note (format nil "META-DIAG: Event ~A at ~A, stack-depth ~A"
+                           (getf evt-record :event)
+                           (getf evt-record :timestamp)
+                           (length (getf evt-record :stack)))))
+    (vector-push-extend
+      (list :diag-note meta-note
+            :trace-id (getf evt-record :trace-id)
+            :source (getf evt-record :source)) *toolchain-reflection-log*)))
+
+(defun reflection-error (err context)
+  "Captures error with backtrace, associates with current toolchain event."
+  (let ((rec (list :timestamp (get-universal-time)
+                   :error err
+                   :context context
+                   :stack (copy-seq *toolchain-event-stack*))))
+    (vector-push-extend rec *error-backtrace-log*)
+    (when *meta-diagnostics-enabled*
+      (vector-push-extend
+        (list :diag-note
+              (format nil "ERROR: ~A in context ~A [stack-depth ~A]" err context (length (getf rec :stack))))
+        *toolchain-reflection-log*))
+    rec))
+
+(defun dump-reflection-state ()
+  "Prints complete structured diagnostic state of the toolchain reflection core."
+  (format t "~%======= TOOLCHAIN REFLECTION STATE DUMP =======~%")
+  (map nil (lambda (evt) (format t "~A~%" evt)) *toolchain-reflection-log*)
+  (format t "~&------- ERROR BACKTRACE -------~%")
+  (map nil (lambda (err) (format t "~A~%" err)) *error-backtrace-log*)
+  (format t "~&Event Stack (latest): ~A~%" (reverse (coerce *toolchain-event-stack* 'list)))
+  (format t "Meta Diagnostics: ~A~%" *meta-diagnostics-enabled*)
+  (format t "========== END DUMP ==========~%"))
+
+;; Example usage (devtools/init/test):
+#|
+(handler-case
+    (progn
+      (reflect-toolchain-event "INIT-START" :source 'aln-devtools)
+      (reflect-toolchain-event "CHECK-CONFIG")
+      (error "Simulated config failure"))
+  (error (e)
+    (reflection-error e "CHECK-CONFIG")))
+(dump-reflection-state)
+|#
