@@ -1,0 +1,17 @@
+{
+  "warden_kine": {
+    "terse": [
+      "Drop it. Palms wide.",
+      "You bleed. You stop moving. We both live."
+    ],
+    "pressure": [
+      "Your toy jammed. Next mistake is your last."
+    ]
+  },
+  "drifter": {
+    "guarded": [
+      "Take the pistol. I walk.",
+      "There's a cache on the ridge. You can have it."
+    ]
+  }
+}
