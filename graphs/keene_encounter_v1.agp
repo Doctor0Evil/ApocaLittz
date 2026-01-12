@@ -1,0 +1,13 @@
+@GRAPH keene_encounter_v1.agp {
+  (p) pid:#{310.201.001.001.001} - Summit-Approach   dep_ref: "narrative-node:opening"        ps: "prelude"
+  (p) pid:#{310.201.001.001.002} - Sleet-Roll        dep_ref: "env:drift"                     ps: "weather"
+  (p) pid:#{310.201.001.001.003} - Warden-Contact    dep_ref: "ai:threat-eval"                ps: "first-contact"
+  (p) pid:#{310.201.001.001.004} - Jammed-Sidearm    dep_ref: "combat:misfire-check"          ps: "failure-beat"
+  (p) pid:#{310.201.001.001.005} - Plasma-Counter    dep_ref: "combat:counter-play"           ps: "turnabout"
+  (p) pid:#{310.201.001.001.006} - Clinic-Wake       dep_ref: "narrative:aftershock"          ps: "denouement"
+  EDGE #{310.201.001.001.001} -> #{310.201.001.001.002} dep_ref\\ps: "entry\\weather"
+  EDGE #{310.201.001.001.002} -> #{310.201.001.001.003} dep_ref\\ps: "sleet\\contact"
+  EDGE #{310.201.001.001.003} -> #{310.201.001.001.004} dep_ref\\ps: "threat\\misfire"
+  EDGE #{310.201.001.001.004} -> #{310.201.001.001.005} dep_ref\\ps: "panic\\counter"
+  EDGE #{310.201.001.001.005} -> #{310.201.001.001.006} dep_ref\\ps: "blast\\wake"
+}
