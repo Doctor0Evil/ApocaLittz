@@ -1,0 +1,44 @@
+// ===========================
+// ALN • TEMPERATURE_ADAPTATION
+// ===========================
+
+@PACKAGE TEMPERATURE_ADAPTATION {
+  GLOBAL STATE { temperature: 0.7, plasticity: 0.0, momentum: 0.0 }
+
+  GLOBAL MODES {
+    low:    { label: "analytical",  creativity: -0.3, logic: +0.4, exploration: -0.4 },
+    medium: { label: "hybrid",      creativity:  0.0, logic:  0.0, exploration:  0.0 },
+    high:   { label: "creative",    creativity: +0.4, logic: -0.2, exploration: +0.4 },
+    extreme:{ label: "stochastic",  creativity: +0.7, logic: -0.5, exploration: +0.7 }
+  }
+
+  ACTION classify {
+    INPUT t float
+    EXEC {
+      IF t < 0.45 RETURN MODES.low
+      IF t < 0.85 RETURN MODES.medium
+      IF t < 1.5  RETURN MODES.high
+      RETURN MODES.extreme
+    }
+  }
+
+  ACTION apply {
+    INPUT new_t float, old_t float
+    EXEC {
+      delta = new_t - old_t
+      STATE.temperature = new_t
+      STATE.plasticity += ABS(delta) * 0.2
+      STATE.momentum   += delta * 0.3
+
+      mode = CALL classify(new_t)
+
+      ROUTING = {
+        creativity_bias: mode.creativity,
+        logic_bias: mode.logic,
+        exploration_bias: mode.exploration
+      }
+
+      RETURN { mode: mode.label, routing: ROUTING, plasticity: STATE.plasticity, momentum: STATE.momentum }
+    }
+  }
+}
