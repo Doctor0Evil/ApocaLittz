@@ -1,0 +1,15 @@
+@GRAPH encounter_pipeline_v2.agp {
+  (p) pid:#{300.101.001.001.001} - Ai-Decision        dep_ref: "ai-decision-tree"          ps: "logic-category"
+  (p) pid:#{300.101.001.001.002} - Env-Drift          dep_ref: "core-gameplay-mechanics"   ps: "world-liveliness"
+  (p) pid:#{300.101.001.001.003} - Narrative-Gates    dep_ref: "possible-choice-matrix"    ps: "user-driven-progression"
+  (p) pid:#{300.101.001.001.004} - Combat-Loop        dep_ref: "gameloop.processes"        ps: "resolution-cycle"
+  (p) pid:#{300.101.001.001.005} - Learning-Update    dep_ref: "events.logic"              ps: "policy-adaptation"
+  (p) pid:#{300.101.001.001.006} - Observability      dep_ref: "debug-trace"               ps: "telemetry"
+  (p) pid:#{300.101.001.001.007} - Overflow-Guard     dep_ref: "queue-safety"              ps: "backpressure"
+  EDGE #{300.101.001.001.002} -> #{300.101.001.001.003} dep_ref\\ps: "env\\gates"
+  EDGE #{300.101.001.001.003} -> #{300.101.001.001.001} dep_ref\\ps: "gates\\ai-decision"
+  EDGE #{300.101.001.001.001} -> #{300.101.001.001.004} dep_ref\\ps: "tactic\\combat"
+  EDGE #{300.101.001.001.004} -> #{300.101.001.001.005} dep_ref\\ps: "outcome\\policy"
+  EDGE #{300.101.001.001.001} -> #{300.101.001.001.006} dep_ref\\ps: "choice\\trace"
+  EDGE #{300.101.001.001.006} -> #{300.101.001.001.007} dep_ref\\ps: "metrics\\guard"
+}
