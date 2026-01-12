@@ -1,0 +1,26 @@
+// ===========================
+// ALN • PERSONALITY
+// ===========================
+
+@PACKAGE PERSONALITY {
+  GLOBAL PROFILES {
+    warden_kine: {
+      grit: 0.8, mercy: 0.3, pride: 0.6, caution: 0.4, curiosity: 0.2,
+      style: ["terse","direct"], escalation_bias: 0.6
+    },
+    drifter: {
+      grit: 0.5, mercy: 0.5, pride: 0.4, caution: 0.3, curiosity: 0.7,
+      style: ["dry","guarded"], escalation_bias: 0.4
+    }
+  }
+
+  ACTION sample_tactic {
+    INPUT profile map, context map, temperature float
+    EXEC {
+      tactics = ["rush","feint","pressure","break_off","threaten","parley"]
+      weights = CALL UTIL.tactic_weights(profile, context)
+      pick    = CALL UTIL.softmax_sample(tactics, weights, temperature)
+      RETURN pick
+    }
+  }
+}
