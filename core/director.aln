@@ -1,0 +1,34 @@
+// ===========================
+// ALN • DIRECTOR
+// ===========================
+
+@PACKAGE DIRECTOR {
+  GLOBAL STATE {
+    tension: 0.4,
+    entropy: 0.5,
+    cooldowns: {},
+    budget: 1.0
+  }
+
+  ACTION tick {
+    INPUT context map
+    EXEC {
+      base = STATE.tension * 0.6 + STATE.entropy * 0.4
+      noise = CALL UTIL.white_noise(0.18)
+      hysteresis = CALL UTIL.hysteresis(STATE.cooldowns, context)
+      surprise = CALL UTIL.surprise(context)
+      score = base + noise - hysteresis + surprise
+
+      IF score > 0.65 AND STATE.budget > 0.2 THEN
+        ev = CALL UTIL.sample_event(context)
+        cd_len = CALL UTIL.uniform(0.4, 0.9)
+        CALL UTIL.cooldown(STATE.cooldowns, ev, cd_len)
+        STATE.budget -= 0.3
+        RETURN { trigger: true, event: ev, score: score }
+      ENDIF
+
+      STATE.budget = MIN(1.0, STATE.budget + 0.08)
+      RETURN { trigger: false, score: score }
+    }
+  }
+}
