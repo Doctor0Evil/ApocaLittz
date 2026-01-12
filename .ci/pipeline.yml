@@ -1,0 +1,29 @@
+stages: [lint, build, unit, sim, fuzz, perf]
+
+lint:
+  run: |
+    pnpm dlx biome check .
+    cargo clippy -- -D warnings
+
+build:
+  run: |
+    pnpm -s build
+    cargo build --release
+
+unit:
+  run: |
+    pnpm -s test -- --runInBand
+    cargo test
+
+sim:
+  run: |
+    node dist/sim.js --seed 4242 --ticks 500 --out trace.json
+    node tools/viz.js --input trace.json --out web/viz
+
+fuzz:
+  run: |
+    cargo fuzz run parser -- -runs=20000 || true
+
+perf:
+  run: |
+    cargo bench || true
