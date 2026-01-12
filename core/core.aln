@@ -1,0 +1,30 @@
+// ===========================
+// ALN • CORE
+// ===========================
+
+@PACKAGE CORE {
+  GLOBAL CLOCK { tick: 0 }
+  GLOBAL RNG   { seed: 0xA1C3 }
+
+  ACTION next_tick {
+    EXEC {
+      CLOCK.tick += 1
+    }
+  }
+
+  ACTION set_seed {
+    INPUT s int
+    EXEC {
+      RNG.seed = s
+      RETURN RNG.seed
+    }
+  }
+
+  ACTION rand01 {
+    EXEC {
+      // Simple LCG stub for deterministic replay
+      RNG.seed = (1103515245 * RNG.seed + 12345) % 2147483648
+      RETURN (RNG.seed / 2147483648.0)
+    }
+  }
+}
