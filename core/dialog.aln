@@ -1,0 +1,20 @@
+// ===========================
+// ALN • DIALOG
+// ===========================
+
+@PACKAGE DIALOG {
+  ACTION negotiate {
+    INPUT speaker map, listener map, context map
+    EXEC {
+      base = speaker.stats.charisma * 0.05
+      base -= (speaker.traits.impairment ? 0.10 : 0.0)
+      base += (listener.hp < listener.hp_max * 0.5 ? 0.10 : 0.0)
+      base -= (context.just_shot ? 0.20 : 0.0)
+
+      chance = CLAMP(0.05, 0.90, base)
+      roll = CALL UTIL.uniform(0.0, 1.0)
+
+      RETURN { success: roll <= chance, chance: chance }
+    }
+  }
+}
