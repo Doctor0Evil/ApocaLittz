@@ -1,0 +1,14 @@
+{
+  "name": "@aln/monitor",
+  "version": "0.1.0",
+  "main": "dist/npcMonitor.js",
+  "types": "dist/npcMonitor.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
