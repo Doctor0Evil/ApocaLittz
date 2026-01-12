@@ -1,0 +1,26 @@
+// ===========================
+// ALN • ENV_SIM
+// ===========================
+
+@PACKAGE ENV_SIM {
+  GLOBAL ENV {
+    weather: "sleet",
+    temperature_c: -3,
+    wind_mps: 7,
+    visibility: 0.6,
+    ground: "mud_snow",
+    time_of_day: "dusk"
+  }
+
+  ACTION sample {
+    EXEC {
+      vis_delta = CALL UTIL.noise(0.05)
+      wind_delta = CALL UTIL.noise(0.8)
+
+      ENV.visibility = CLAMP(0.3, 1.0, ENV.visibility + vis_delta)
+      ENV.wind_mps   = MAX(0, ENV.wind_mps + wind_delta)
+
+      RETURN ENV
+    }
+  }
+}
