@@ -1,0 +1,20 @@
+// ===========================
+// ALN • STATUS
+// ===========================
+
+@PACKAGE STATUS {
+  ACTION derive_actor_mods {
+    INPUT actor map, env map
+    EXEC {
+      mods = {
+        hydration: actor.flags.dehydrated ? -0.10 : 0.0,
+        sleep: actor.flags.sleep_deprived ? -0.10 : 0.0,
+        eyewear: actor.gear.eyewear == "broken" ? -0.05 : 0.0,
+        wet: actor.flags.wet ? -0.05 : 0.0,
+        boots: actor.gear.boots == "none" ? -0.10 : 0.0,
+        cold: env.temperature_c < 0 ? -0.05 : 0.0
+      }
+      RETURN mods
+    }
+  }
+}
