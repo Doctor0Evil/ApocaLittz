@@ -1,0 +1,2 @@
+# Run nightly simulations at 02:15, append logs
+15 2 * * * /bin/bash -lc '/proj/scripts/dev.sh >> /proj/logs/nightly.log 2>&1'
