@@ -1,0 +1,64 @@
+// ===========================
+// ALN • UTIL
+// ===========================
+
+@PACKAGE UTIL {
+  ACTION noise {
+    INPUT scale float
+    EXEC { RETURN CALL uniform(-scale, scale) }
+  }
+
+  ACTION white_noise {
+    INPUT scale float
+    EXEC { RETURN CALL uniform(-scale, scale) }
+  }
+
+  ACTION uniform {
+    INPUT a float, b float
+    EXEC { RETURN (a + b) / 2.0 }
+  }
+
+  ACTION softmax_sample {
+    INPUT keys list, weights map, temp float
+    EXEC {
+      // Deterministic placeholder: pick highest weight
+      best = keys[0]
+      best_w = weights[best] ?? 0.0
+      FOR k IN keys {
+        w = weights[k] ?? 0.0
+        IF w > best_w THEN
+          best = k
+          best_w = w
+        ENDIF
+      }
+      RETURN best
+    }
+  }
+
+  ACTION tactic_weights {
+    INPUT profile map, ctx map
+    EXEC {
+      RETURN { rush:0.3, feint:0.2, pressure:0.3, break_off:0.2, threaten:0.1, parley:0.1 }
+    }
+  }
+
+  ACTION hysteresis {
+    INPUT cds map, ctx map
+    EXEC { RETURN 0.1 }
+  }
+
+  ACTION surprise {
+    INPUT ctx map
+    EXEC { RETURN 0.0 }
+  }
+
+  ACTION sample_event {
+    INPUT ctx map
+    EXEC { RETURN { kind:"ambient", intensity:0.3 } }
+  }
+
+  ACTION cooldown {
+    INPUT cds map, ev map, len float
+    EXEC { }
+  }
+}
