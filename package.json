@@ -1,0 +1,26 @@
+{
+  "name": "aln-encounter-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-driven encounter and narrative framework with ALN DSL, TypeScript orchestration, and Rust cores.",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm dlx biome check .",
+    "sim": "node dist/sim.js --seed 4242 --ticks 200 --out logs/trace.json",
+    "viz": "node tools/viz.js --input logs/trace.json --out web/viz",
+    "dev": "bash scripts/dev.sh"
+  },
+  "workspaces": [
+    "narrative",
+    "monitor",
+    "tools",
+    "tests"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
