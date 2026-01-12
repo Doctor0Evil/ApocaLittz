@@ -1,0 +1,47 @@
+// ===========================
+// ALN • COMBAT
+// ===========================
+
+@PACKAGE COMBAT {
+  GLOBAL RULES {
+    base_variance: [0.85, 1.15],
+    armor_floor: 1,
+    cover_scalar: 0.15
+  }
+
+  ACTION accuracy {
+    INPUT base float, mods map, env map, situational map
+    EXEC {
+      acc = base
+      acc += situational.opening_bonus ?? 0.0
+      acc -= (mods.hydration + mods.sleep + mods.eyewear + mods.wet + mods.cold)
+      acc -= (env.visibility < 0.5 ? 0.05 : 0.0)
+      RETURN CLAMP(0.05, 0.95, acc)
+    }
+  }
+
+  ACTION damage {
+    INPUT base float, ammo_mod float, variance float, target_armor float
+    EXEC {
+      raw = base * ammo_mod * variance
+      RETURN MAX(RULES.armor_floor, FLOOR(raw - target_armor))
+    }
+  }
+
+  ACTION take_turn {
+    INPUT attacker map, defender map, env map
+    EXEC {
+      v = CALL UTIL.uniform(RULES.base_variance[0], RULES.base_variance[1])
+      hit_p = CALL accuracy(attacker.base_acc, attacker.mods, env, attacker.situational)
+      roll = CALL UTIL.uniform(0.0, 1.0)
+
+      IF roll <= hit_p THEN
+        dmg = CALL damage(attacker.base_dmg, attacker.ammo_mod, v, defender.armor)
+        defender.hp -= dmg
+        RETURN { hit: true, dmg: dmg, defender_hp: defender.hp }
+      ELSE
+        RETURN { hit: false, dmg: 0, defender_hp: defender.hp }
+      ENDIF
+    }
+  }
+}
